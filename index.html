@@ -131,6 +131,19 @@
   .chart-controls select{min-width:200px;}
   .chart-container{width:100%; height:480px;}
   .add-chart-preview{margin-top:18px; padding-top:18px; border-top:1px dashed var(--line);}
+  .total-cost-row{
+    font-size:13px; color:var(--muted); background:var(--surface-alt);
+    border:1px solid var(--line); border-radius:6px; padding:10px 12px;
+  }
+  .total-cost-value{color:var(--gold); font-size:16px; font-weight:600;}
+  .price-fetch-row{display:flex; gap:6px;}
+  .price-fetch-row input{flex:1;}
+  .fetch-status{font-size:11px; color:var(--muted); margin-top:4px; min-height:14px;}
+  .api-key-row{
+    border-top:1px dashed var(--line); margin-top:14px; padding-top:12px;
+  }
+  .api-key-row-inner{display:flex; gap:6px; align-items:flex-end; flex-wrap:wrap;}
+  .api-key-row-inner label{flex:1; min-width:200px;}
 
   .badge{
     font-family:'IBM Plex Mono',monospace; font-size:10px; padding:2px 7px; border-radius:20px;
@@ -205,11 +218,27 @@
           <input type="number" id="fQty" step="any" min="0" required>
         </label>
         <label>Kaufpreis (€)
-          <input type="number" id="fPrice" step="any" min="0" required>
+          <div class="price-fetch-row">
+            <input type="number" id="fPrice" step="any" min="0" required>
+            <button type="button" class="ghost small" id="fetchQuoteBtn">Kurs abrufen</button>
+          </div>
         </label>
         <label>Kaufdatum
           <input type="date" id="fDate">
         </label>
+        <div class="full fetch-status" id="fetchQuoteStatus"></div>
+        <div class="full api-key-row" id="apiKeyRow">
+          <div class="api-key-row-inner">
+            <label>Finnhub API-Key (für automatische Kursabfrage)
+              <input type="password" id="finnhubKeyInput" placeholder="Dein Finnhub API-Key" autocomplete="off">
+            </label>
+            <button type="button" class="ghost small" id="saveFinnhubKeyBtn">Speichern</button>
+          </div>
+          <div class="panel-sub" id="finnhubKeyStatus" style="margin-top:6px">Ohne Key: Kurs wie bisher manuell eintragen.</div>
+        </div>
+        <div class="full total-cost-row" id="totalCostRow" style="display:none">
+          Gesamtkosten: <span id="totalCostValue" class="mono total-cost-value">–</span>
+        </div>
         <div class="full deriv-fields" id="derivFields" style="display:none">
           <div class="deriv-fields-title">Derivate-Details</div>
           <div class="deriv-fields-grid">
@@ -296,6 +325,7 @@ const derivClasses = ['Optionsschein','Zertifikat'];
 document.getElementById('fClass').addEventListener('change', (e) => {
   document.getElementById('derivFields').style.display = derivClasses.includes(e.target.value) ? 'block' : 'none';
   scheduleChartPreview();
+  refreshFetchButtonState();
 });
 
 let chartPreviewTimeout = null;
@@ -318,6 +348,100 @@ function scheduleChartPreview(){
 }
 document.getElementById('fSymbol').addEventListener('input', scheduleChartPreview);
 document.getElementById('fUnderlying').addEventListener('input', scheduleChartPreview);
+
+function updateTotalCost(){
+  const qty = parseFloat(document.getElementById('fQty').value);
+  const price = parseFloat(document.getElementById('fPrice').value);
+  const row = document.getElementById('totalCostRow');
+  const valueEl = document.getElementById('totalCostValue');
+  if(!isNaN(qty) && qty > 0 && !isNaN(price) && price >= 0){
+    row.style.display = 'block';
+    valueEl.textContent = fmtEUR(qty * price);
+  } else {
+    row.style.display = 'none';
+  }
+}
+document.getElementById('fQty').addEventListener('input', updateTotalCost);
+document.getElementById('fPrice').addEventListener('input', updateTotalCost);
+
+// --- Finnhub: automatische Kursabfrage ---
+const FINNHUB_SUFFIX_MAP = {
+  'XETR':'.DE','FWB':'.DE','STU':'.DE','GER':'.DE','FRA':'.DE',
+  'LSE':'.L','LSIN':'.L',
+  'EURONEXT':'.PA','PAR':'.PA',
+  'MIL':'.MI','BIT':'.MI',
+  'SIX':'.SW','SWX':'.SW',
+  'TSE':'.T',
+  'HKEX':'.HK',
+  'TSX':'.TO','TSXV':'.V',
+  'ASX':'.AX'
+};
+function toFinnhubSymbol(tvSymbol){
+  const parts = tvSymbol.split(':');
+  if(parts.length < 2) return tvSymbol;
+  const exch = parts[0].toUpperCase();
+  const ticker = parts[1];
+  if(FINNHUB_SUFFIX_MAP[exch]) return ticker + FINNHUB_SUFFIX_MAP[exch];
+  return ticker;
+}
+
+function getFinnhubKey(){ return localStorage.getItem('finnhubApiKey') || ''; }
+
+function refreshFinnhubKeyUI(){
+  const key = getFinnhubKey();
+  const status = document.getElementById('finnhubKeyStatus');
+  if(key){
+    document.getElementById('finnhubKeyInput').value = key;
+    status.textContent = 'API-Key gespeichert ✓';
+  } else {
+    status.textContent = 'Ohne Key: Kurs wie bisher manuell eintragen.';
+  }
+}
+
+document.getElementById('saveFinnhubKeyBtn').addEventListener('click', () => {
+  const v = document.getElementById('finnhubKeyInput').value.trim();
+  if(v){ localStorage.setItem('finnhubApiKey', v); }
+  else { localStorage.removeItem('finnhubApiKey'); }
+  refreshFinnhubKeyUI();
+});
+
+function refreshFetchButtonState(){
+  const isDeriv = derivClasses.includes(document.getElementById('fClass').value);
+  const btn = document.getElementById('fetchQuoteBtn');
+  btn.style.display = isDeriv ? 'none' : 'inline-block';
+  document.getElementById('fetchQuoteStatus').textContent = isDeriv
+    ? 'Bei Optionsscheinen/Zertifikaten entspricht der Kurs des Basiswerts nicht dem Kaufpreis des Scheins — bitte manuell eintragen.'
+    : '';
+}
+
+async function fetchQuote(){
+  const raw = document.getElementById('fSymbol').value.trim().toUpperCase();
+  const status = document.getElementById('fetchQuoteStatus');
+  const btn = document.getElementById('fetchQuoteBtn');
+  if(!raw){ status.textContent = 'Bitte zuerst ein Symbol eingeben.'; return; }
+  const key = getFinnhubKey();
+  if(!key){ status.textContent = 'Kein Finnhub API-Key hinterlegt (siehe Feld unten).'; return; }
+  const finnhubSymbol = toFinnhubSymbol(raw);
+  btn.disabled = true;
+  status.textContent = 'Lade Kurs für ' + finnhubSymbol + ' …';
+  try{
+    const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(finnhubSymbol)}&token=${encodeURIComponent(key)}`);
+    const data = await res.json();
+    if(data && typeof data.c === 'number' && data.c > 0){
+      document.getElementById('fPrice').value = data.c;
+      updateTotalCost();
+      status.textContent = `Kurs übernommen: ${data.c.toLocaleString('de-DE',{maximumFractionDigits:4})} € (Finnhub, ${finnhubSymbol})`;
+    } else {
+      status.textContent = `Kein Kurs gefunden für ${finnhubSymbol}. Bei europäischen/asiatischen Werten ggf. abweichendes Finnhub-Symbol nötig — bitte manuell eintragen.`;
+    }
+  }catch(e){
+    status.textContent = 'Abruf fehlgeschlagen — bitte manuell eintragen.';
+  }
+  btn.disabled = false;
+}
+document.getElementById('fetchQuoteBtn').addEventListener('click', fetchQuote);
+refreshFinnhubKeyUI();
+refreshFetchButtonState();
 
 const STATE_KEY = 'state';
 let state = { cash: 100000, startingCapital: 100000, positions: [], history: [], chartSymbol: null };
@@ -746,6 +870,8 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
   e.target.reset();
   document.getElementById('derivFields').style.display = 'none';
   document.getElementById('addChartPreviewWrap').style.display = 'none';
+  document.getElementById('totalCostRow').style.display = 'none';
+  refreshFetchButtonState();
   renderAll();
 });
 
