@@ -229,8 +229,8 @@
         <div class="full fetch-status" id="fetchQuoteStatus"></div>
         <div class="full api-key-row" id="apiKeyRow">
           <div class="api-key-row-inner">
-            <label>Finnhub API-Key (für automatische Kursabfrage)
-              <input type="password" id="finnhubKeyInput" placeholder="Dein Finnhub API-Key" autocomplete="off">
+            <label>Eigener Finnhub API-Key (optional, überschreibt Standard)
+              <input type="password" id="finnhubKeyInput" placeholder="Nur bei eigenem Key nötig" autocomplete="off">
             </label>
             <button type="button" class="ghost small" id="saveFinnhubKeyBtn">Speichern</button>
           </div>
@@ -385,16 +385,18 @@ function toFinnhubSymbol(tvSymbol){
   return ticker;
 }
 
-function getFinnhubKey(){ return localStorage.getItem('finnhubApiKey') || ''; }
+const FINNHUB_DEFAULT_KEY = 'd9vfgmhr01qguah55fsgd9vfgmhr01qguah55ft0';
+function getFinnhubKey(){ return localStorage.getItem('finnhubApiKey') || FINNHUB_DEFAULT_KEY; }
 
 function refreshFinnhubKeyUI(){
-  const key = getFinnhubKey();
+  const override = localStorage.getItem('finnhubApiKey');
   const status = document.getElementById('finnhubKeyStatus');
-  if(key){
-    document.getElementById('finnhubKeyInput').value = key;
-    status.textContent = 'API-Key gespeichert ✓';
+  if(override){
+    document.getElementById('finnhubKeyInput').value = override;
+    status.textContent = 'Eigener API-Key gespeichert ✓ (überschreibt den Standard-Key auf diesem Gerät)';
   } else {
-    status.textContent = 'Ohne Key: Kurs wie bisher manuell eintragen.';
+    document.getElementById('finnhubKeyInput').value = '';
+    status.textContent = 'Standard-API-Key ist bereits hinterlegt ✓ — auf allen Geräten aktiv, kein Eintrag nötig.';
   }
 }
 
