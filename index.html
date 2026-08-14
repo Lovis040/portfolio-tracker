@@ -227,15 +227,16 @@
           <input type="date" id="fDate">
         </label>
         <div class="full fetch-status" id="fetchQuoteStatus"></div>
-        <div class="full api-key-row" id="apiKeyRow">
-          <div class="api-key-row-inner">
-            <label>Eigener Finnhub API-Key (optional, überschreibt Standard)
+        <details class="full api-key-row" id="apiKeyRow">
+          <summary style="cursor:pointer; color:var(--muted); font-size:12px;">Erweitert: eigener Finnhub API-Key (optional)</summary>
+          <div class="api-key-row-inner" style="margin-top:10px;">
+            <label>Eigener Finnhub API-Key (überschreibt Standard auf diesem Gerät)
               <input type="password" id="finnhubKeyInput" placeholder="Nur bei eigenem Key nötig" autocomplete="off">
             </label>
             <button type="button" class="ghost small" id="saveFinnhubKeyBtn">Speichern</button>
           </div>
-          <div class="panel-sub" id="finnhubKeyStatus" style="margin-top:6px">Ohne Key: Kurs wie bisher manuell eintragen.</div>
-        </div>
+          <div class="panel-sub" id="finnhubKeyStatus" style="margin-top:6px">Standard-API-Key ist bereits aktiv.</div>
+        </details>
         <div class="full total-cost-row" id="totalCostRow" style="display:none">
           Gesamtkosten: <span id="totalCostValue" class="mono total-cost-value">–</span>
         </div>
@@ -428,6 +429,11 @@ async function fetchQuote(){
   status.textContent = 'Lade Kurs für ' + finnhubSymbol + ' …';
   try{
     const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(finnhubSymbol)}&token=${encodeURIComponent(key)}`);
+    if(!res.ok){
+      status.textContent = `Finnhub antwortete mit Fehler ${res.status} (${res.statusText}) für ${finnhubSymbol} — bitte manuell eintragen.`;
+      btn.disabled = false;
+      return;
+    }
     const data = await res.json();
     if(data && typeof data.c === 'number' && data.c > 0){
       document.getElementById('fPrice').value = data.c;
@@ -437,7 +443,8 @@ async function fetchQuote(){
       status.textContent = `Kein Kurs gefunden für ${finnhubSymbol}. Bei europäischen/asiatischen Werten ggf. abweichendes Finnhub-Symbol nötig — bitte manuell eintragen.`;
     }
   }catch(e){
-    status.textContent = 'Abruf fehlgeschlagen — bitte manuell eintragen.';
+    const msg = (e && e.message) ? e.message : 'Unbekannter Fehler';
+    status.textContent = `Abruf fehlgeschlagen (${msg}) — vermutlich blockiert der Kursdienst Anfragen direkt aus dem Browser (CORS). Bitte manuell eintragen.`;
   }
   btn.disabled = false;
 }
