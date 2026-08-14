@@ -1,0 +1,766 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Depot-Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E1420;
+    --surface:#161F2E;
+    --surface-alt:#1B2536;
+    --line:#2A3548;
+    --text:#ECEFF4;
+    --muted:#8993A8;
+    --gold:#C6A15B;
+    --brick:#C1665C;
+    --blue:#6C8CB0;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    padding-bottom:60px;
+  }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .display{font-family:'Space Grotesk',sans-serif;}
+
+  /* Masthead */
+  .masthead{
+    padding:28px 24px 20px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(198,161,91,0.06), transparent 60%);
+  }
+  .masthead-top{
+    display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:16px;
+    max-width:1100px; margin:0 auto;
+  }
+  .brand{display:flex; flex-direction:column; gap:4px;}
+  .brand-eyebrow{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--gold);
+  }
+  .brand-title{font-family:'Space Grotesk',sans-serif; font-size:26px; font-weight:600; margin:0;}
+  .stat-row{display:flex; gap:28px; flex-wrap:wrap;}
+  .stat{display:flex; flex-direction:column; gap:2px; min-width:110px;}
+  .stat-label{font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted);}
+  .stat-value{font-family:'IBM Plex Mono',monospace; font-size:20px; font-weight:600;}
+  .pos{color:var(--gold);}
+  .neg{color:var(--brick);}
+
+  /* Ticker ribbon */
+  .ticker-ribbon{
+    background:#10161F;
+    border-bottom:1px solid var(--line);
+    min-height:46px;
+  }
+
+  main{max-width:1100px; margin:0 auto; padding:24px;}
+  @media(max-width:680px){ .chart-container{height:360px;} }
+
+  .panel{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:10px;
+    margin-bottom:20px;
+    overflow:hidden;
+  }
+  .panel-header{
+    padding:14px 18px;
+    border-bottom:1px solid var(--line);
+    display:flex; justify-content:space-between; align-items:center;
+    gap:12px; flex-wrap:wrap;
+  }
+  .panel-title{font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:600; margin:0;}
+  .panel-sub{font-size:12px; color:var(--muted); margin-top:2px;}
+  .panel-body{padding:18px;}
+
+  /* Add form */
+  form.add-form{display:grid; grid-template-columns:repeat(6,1fr); gap:10px;}
+  form.add-form .full{grid-column:1 / -1; font-size:12px; color:var(--muted);}
+  .deriv-fields{
+    border-top:1px dashed var(--line); margin-top:6px; padding-top:12px;
+  }
+  .deriv-fields-title{font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--gold); margin-bottom:8px;}
+  .deriv-fields-grid{display:grid; grid-template-columns:repeat(6,1fr); gap:10px;}
+  label{display:flex; flex-direction:column; gap:5px; font-size:12px; color:var(--muted);}
+  input, select{
+    background:var(--surface-alt); border:1px solid var(--line); color:var(--text);
+    border-radius:6px; padding:8px 10px; font-family:'IBM Plex Mono',monospace; font-size:13px;
+  }
+  input:focus, select:focus{outline:1px solid var(--gold); border-color:var(--gold);}
+  button{
+    cursor:pointer; border-radius:6px; border:1px solid var(--line);
+    background:var(--surface-alt); color:var(--text); font-family:'Inter',sans-serif;
+    font-size:13px; font-weight:500; padding:9px 14px;
+  }
+  button:focus-visible{outline:2px solid var(--gold);}
+  button.primary{background:var(--gold); color:#151B10; border-color:var(--gold); font-weight:600;}
+  button.primary:hover{opacity:.9;}
+  button.ghost:hover{border-color:var(--gold);}
+  button.small{padding:5px 10px; font-size:12px;}
+  button.danger{color:var(--brick);}
+
+  /* Table */
+  table{width:100%; border-collapse:collapse;}
+  th{
+    text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--muted); padding:10px 12px; border-bottom:1px solid var(--line); font-weight:500;
+  }
+  td{padding:12px; border-bottom:1px solid var(--line); font-family:'IBM Plex Mono',monospace; font-size:13px; vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  .entry-no{color:var(--muted); font-size:12px;}
+  .sym-name{font-family:'Inter',sans-serif; color:var(--muted); font-size:11px;}
+  .sym-tag{font-weight:600;}
+  .price-input{width:90px;}
+  .row-actions{display:flex; gap:6px;}
+  .empty-state{padding:40px 18px; text-align:center; color:var(--muted); font-size:14px;}
+  .expand-widget{padding:14px 18px; background:var(--surface-alt); border-bottom:1px solid var(--line);}
+
+  .cash-line{display:flex; align-items:center; gap:10px;}
+  .cash-edit{display:flex; gap:8px; align-items:center;}
+
+  #sparklineWrap{padding:6px 18px 18px;}
+  svg#sparkline{width:100%; height:120px; display:block;}
+
+  .chart-controls{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+  .chart-controls select{min-width:200px;}
+  .chart-container{width:100%; height:480px;}
+  .add-chart-preview{margin-top:18px; padding-top:18px; border-top:1px dashed var(--line);}
+
+  .badge{
+    font-family:'IBM Plex Mono',monospace; font-size:10px; padding:2px 7px; border-radius:20px;
+    border:1px solid var(--line); color:var(--muted); text-transform:uppercase; letter-spacing:.04em;
+  }
+
+  @media(max-width:680px){
+    form.add-form{grid-template-columns:1fr 1fr;}
+    .deriv-fields-grid{grid-template-columns:1fr 1fr;}
+    .stat-row{gap:18px;}
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-top">
+    <div class="brand">
+      <div class="brand-eyebrow">Depot-Ledger &middot; live via TradingView</div>
+      <h1 class="brand-title">Portfolio-Übersicht</h1>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><div class="stat-label">Gesamtwert</div><div class="stat-value" id="statTotal">–</div></div>
+      <div class="stat"><div class="stat-label">Bar</div><div class="stat-value" id="statCash">–</div></div>
+      <div class="stat"><div class="stat-label">G/V gesamt</div><div class="stat-value" id="statPL">–</div></div>
+      <div class="stat"><div class="stat-label">Seit Start</div><div class="stat-value" id="statPLPct">–</div></div>
+    </div>
+  </div>
+</header>
+
+<div class="ticker-ribbon" id="tickerTapeWrap"></div>
+
+<main>
+
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2 class="panel-title">Bargeld</h2>
+        <div class="panel-sub">Startkapital 100.000&nbsp;€ &middot; für Ein-/Auszahlungen anpassen</div>
+      </div>
+      <div class="cash-line" id="cashDisplay"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2 class="panel-title">Position hinzufügen</h2>
+        <div class="panel-sub">Symbol im TradingView-Format, z.&nbsp;B. NASDAQ:AAPL, XETR:SAP, BINANCE:BTCEUR, TVC:GOLD</div>
+      </div>
+    </div>
+    <div class="panel-body">
+      <form class="add-form" id="addForm">
+        <label>Symbol (TradingView)
+          <input type="text" id="fSymbol" placeholder="XETR:SAP" required autocomplete="off">
+        </label>
+        <label>Anzeigename
+          <input type="text" id="fName" placeholder="SAP SE" autocomplete="off">
+        </label>
+        <label>Anlageklasse
+          <select id="fClass">
+            <option>Aktie</option>
+            <option>ETF</option>
+            <option>Fonds</option>
+            <option>Krypto</option>
+            <option>Rohstoff</option>
+            <option>Optionsschein</option>
+            <option>Zertifikat</option>
+          </select>
+        </label>
+        <label>Menge
+          <input type="number" id="fQty" step="any" min="0" required>
+        </label>
+        <label>Kaufpreis (€)
+          <input type="number" id="fPrice" step="any" min="0" required>
+        </label>
+        <label>Kaufdatum
+          <input type="date" id="fDate">
+        </label>
+        <div class="full deriv-fields" id="derivFields" style="display:none">
+          <div class="deriv-fields-title">Derivate-Details</div>
+          <div class="deriv-fields-grid">
+            <label>Basiswert (TradingView-Symbol)
+              <input type="text" id="fUnderlying" placeholder="XETR:SAP" autocomplete="off">
+            </label>
+            <label>Typ
+              <select id="fDerivType">
+                <option>Call</option>
+                <option>Put</option>
+                <option>Sonstiges</option>
+              </select>
+            </label>
+            <label>Basispreis / Strike
+              <input type="number" id="fStrike" step="any" min="0">
+            </label>
+            <label>Hebel
+              <input type="number" id="fLeverage" step="any" min="0">
+            </label>
+            <label>Fälligkeit
+              <input type="date" id="fExpiry">
+            </label>
+            <label>WKN / ISIN
+              <input type="text" id="fWkn" autocomplete="off">
+            </label>
+          </div>
+        </div>
+        <div class="full">
+          <button type="submit" class="primary">Position anlegen</button>
+        </div>
+      </form>
+      <div class="add-chart-preview" id="addChartPreviewWrap" style="display:none">
+        <div class="panel-sub" style="margin-bottom:8px">Live-Vorschau: <span id="addChartPreviewSymbol">–</span></div>
+        <div class="chart-container" id="addChartContainer" style="height:360px"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2 class="panel-title">Positionen</h2>
+        <div class="panel-sub">Live-Kurs am TradingView-Widget ablesen und übernehmen</div>
+      </div>
+    </div>
+    <div id="positionsWrap"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2 class="panel-title">Chart</h2>
+        <div class="panel-sub" id="chartPanelSub">Live TradingView-Chart deiner Positionen — im Chart kannst du auch frei suchen</div>
+      </div>
+      <div class="chart-controls">
+        <select id="chartSelect"></select>
+        <input type="text" id="chartCustomSymbol" placeholder="Eigenes Symbol, z. B. NASDAQ:TSLA" style="width:190px">
+        <button class="ghost small" id="chartCustomBtn">Anzeigen</button>
+      </div>
+    </div>
+    <div class="chart-container" id="chartContainer"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2 class="panel-title">Verlauf</h2>
+        <div class="panel-sub">Ein Punkt pro gespeichertem Snapshot</div>
+      </div>
+      <button class="primary small" id="snapshotBtn">Snapshot speichern</button>
+    </div>
+    <div id="sparklineWrap"><svg id="sparkline" viewBox="0 0 600 120" preserveAspectRatio="none"></svg></div>
+  </section>
+
+</main>
+
+<script>
+const fmtEUR = n => n.toLocaleString('de-DE', {style:'currency', currency:'EUR', maximumFractionDigits:2});
+const fmtPct = n => (n>=0?'+':'') + n.toLocaleString('de-DE', {maximumFractionDigits:2}) + ' %';
+const fmtQty = n => n.toLocaleString('de-DE', {maximumFractionDigits:8});
+const todayISO = () => new Date().toISOString().slice(0,10);
+
+const derivClasses = ['Optionsschein','Zertifikat'];
+document.getElementById('fClass').addEventListener('change', (e) => {
+  document.getElementById('derivFields').style.display = derivClasses.includes(e.target.value) ? 'block' : 'none';
+  scheduleChartPreview();
+});
+
+let chartPreviewTimeout = null;
+function scheduleChartPreview(){
+  clearTimeout(chartPreviewTimeout);
+  chartPreviewTimeout = setTimeout(() => {
+    const isDeriv = derivClasses.includes(document.getElementById('fClass').value);
+    const underlyingVal = document.getElementById('fUnderlying').value.trim().toUpperCase();
+    const symbolVal = document.getElementById('fSymbol').value.trim().toUpperCase();
+    const preview = (isDeriv && underlyingVal) ? underlyingVal : symbolVal;
+    const wrap = document.getElementById('addChartPreviewWrap');
+    if(preview){
+      wrap.style.display = 'block';
+      document.getElementById('addChartPreviewSymbol').textContent = preview;
+      mountChartWidget('addChartContainer', preview);
+    } else {
+      wrap.style.display = 'none';
+    }
+  }, 400);
+}
+document.getElementById('fSymbol').addEventListener('input', scheduleChartPreview);
+document.getElementById('fUnderlying').addEventListener('input', scheduleChartPreview);
+
+const STATE_KEY = 'state';
+let state = { cash: 100000, startingCapital: 100000, positions: [], history: [], chartSymbol: null };
+let editingCash = false;
+let expandedRow = null;
+let currentChartSymbol = null;
+
+async function loadState(){
+  try{
+    const r = await window.storage.get(STATE_KEY);
+    if(r && r.value){ state = JSON.parse(r.value); }
+  }catch(e){ /* no saved state yet — use defaults */ }
+  currentChartSymbol = state.chartSymbol || null;
+  render();
+}
+
+async function saveState(){
+  try{
+    await window.storage.set(STATE_KEY, JSON.stringify(state));
+  }catch(e){ console.error('Speichern fehlgeschlagen', e); }
+}
+
+function positionValue(p){ return (Number(p.currentPrice ?? p.buyPrice)) * Number(p.qty); }
+function positionCost(p){ return Number(p.buyPrice) * Number(p.qty); }
+function positionsTotal(){ return state.positions.reduce((s,p)=>s+positionValue(p),0); }
+function totalValue(){ return state.cash + positionsTotal(); }
+
+function renderSummary(){
+  const total = totalValue();
+  const pl = total - state.startingCapital;
+  const plPct = (pl / state.startingCapital) * 100;
+  document.getElementById('statTotal').textContent = fmtEUR(total);
+  document.getElementById('statCash').textContent = fmtEUR(state.cash);
+  const plEl = document.getElementById('statPL');
+  plEl.textContent = (pl>=0?'+':'') + fmtEUR(pl);
+  plEl.className = 'stat-value ' + (pl>=0?'pos':'neg');
+  const plPctEl = document.getElementById('statPLPct');
+  plPctEl.textContent = fmtPct(plPct);
+  plPctEl.className = 'stat-value ' + (plPct>=0?'pos':'neg');
+}
+
+function renderCash(){
+  const wrap = document.getElementById('cashDisplay');
+  wrap.innerHTML = '';
+  if(!editingCash){
+    const span = document.createElement('span');
+    span.className = 'stat-value mono';
+    span.textContent = fmtEUR(state.cash);
+    const btn = document.createElement('button');
+    btn.className = 'ghost small'; btn.textContent = 'Bearbeiten';
+    btn.onclick = () => { editingCash = true; renderCash(); };
+    wrap.append(span, btn);
+  } else {
+    const input = document.createElement('input');
+    input.type = 'number'; input.step = 'any'; input.value = state.cash;
+    const save = document.createElement('button');
+    save.className = 'primary small'; save.textContent = 'Speichern';
+    save.onclick = async () => {
+      const v = parseFloat(input.value);
+      if(!isNaN(v) && v >= 0){ state.cash = v; await saveState(); }
+      editingCash = false; renderAll();
+    };
+    const cancel = document.createElement('button');
+    cancel.className = 'ghost small'; cancel.textContent = 'Abbrechen';
+    cancel.onclick = () => { editingCash = false; renderCash(); };
+    wrap.append(input, save, cancel);
+  }
+}
+
+function renderPositions(){
+  const wrap = document.getElementById('positionsWrap');
+  wrap.innerHTML = '';
+  if(state.positions.length === 0){
+    const div = document.createElement('div');
+    div.className = 'empty-state';
+    div.textContent = 'Noch keine Positionen. Lege oben deine erste Position an.';
+    wrap.appendChild(div);
+    return;
+  }
+  const table = document.createElement('table');
+  table.innerHTML = `<thead><tr>
+    <th>Nr.</th><th>Symbol</th><th>Klasse</th><th>Menge</th><th>Kaufpreis</th>
+    <th>Aktueller Kurs</th><th>Wert</th><th>G/V</th><th></th>
+  </tr></thead>`;
+  const tbody = document.createElement('tbody');
+
+  state.positions.forEach((p, idx) => {
+    const val = positionValue(p);
+    const cost = positionCost(p);
+    const pl = val - cost;
+    const plPct = cost > 0 ? (pl/cost)*100 : 0;
+
+    let symExtra = '';
+    if(derivClasses.includes(p.assetClass)){
+      const parts = [];
+      if(p.derivType) parts.push(p.derivType);
+      if(p.underlyingSymbol) parts.push('Basis ' + p.underlyingSymbol.split(':').pop());
+      if(p.strike) parts.push('Strike ' + fmtEUR(p.strike));
+      if(p.leverage) parts.push('Hebel ' + p.leverage.toLocaleString('de-DE',{maximumFractionDigits:2}) + 'x');
+      if(p.wkn) parts.push('WKN ' + p.wkn);
+      symExtra = parts.join(' · ');
+    }
+    let expiryBadge = '';
+    if(p.expiry){
+      const days = Math.ceil((new Date(p.expiry) - new Date())/86400000);
+      if(days < 0) expiryBadge = `<span class="badge" style="color:var(--brick);border-color:var(--brick)">Verfallen</span>`;
+      else if(days <= 30) expiryBadge = `<span class="badge" style="color:var(--brick);border-color:var(--brick)">Fällig in ${days}d</span>`;
+      else expiryBadge = `<span class="badge">Fällig ${new Date(p.expiry).toLocaleDateString('de-DE')}</span>`;
+    }
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="entry-no">${String(idx+1).padStart(2,'0')}</td>
+      <td>
+        <div class="sym-tag">${p.symbol}</div>
+        <div class="sym-name">${p.name || ''}</div>
+        ${symExtra ? `<div class="sym-name" style="margin-top:2px">${symExtra}</div>` : ''}
+        ${expiryBadge ? `<div style="margin-top:4px">${expiryBadge}</div>` : ''}
+      </td>
+      <td><span class="badge">${p.assetClass}</span></td>
+      <td>${fmtQty(p.qty)}</td>
+      <td>${fmtEUR(p.buyPrice)}</td>
+      <td></td>
+      <td>${fmtEUR(val)}</td>
+      <td class="${pl>=0?'pos':'neg'}">${(pl>=0?'+':'')+fmtEUR(pl)}<br><span style="font-size:11px">${fmtPct(plPct)}</span></td>
+      <td></td>
+    `;
+
+    // current price cell
+    const priceCell = tr.children[5];
+    const priceInput = document.createElement('input');
+    priceInput.type = 'number'; priceInput.step = 'any'; priceInput.className = 'price-input';
+    priceInput.value = p.currentPrice ?? p.buyPrice;
+    priceInput.title = 'Live-Kurs vom TradingView-Widget ablesen und hier eintragen';
+    priceInput.onchange = async () => {
+      const v = parseFloat(priceInput.value);
+      if(!isNaN(v) && v >= 0){ p.currentPrice = v; await saveState(); renderSummary(); renderPositions(); }
+    };
+    priceCell.appendChild(priceInput);
+
+    // actions cell
+    const actionsCell = tr.children[8];
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'row-actions';
+    const chartBtn = document.createElement('button');
+    chartBtn.className = 'ghost small'; chartBtn.textContent = expandedRow === p.id ? 'Kurs ▲' : 'Kurs ▼';
+    chartBtn.onclick = () => { expandedRow = expandedRow === p.id ? null : p.id; renderPositions(); };
+    const sellBtn = document.createElement('button');
+    sellBtn.className = 'ghost small'; sellBtn.textContent = 'Verkaufen';
+    sellBtn.onclick = async () => {
+      if(confirm(`${p.symbol} zum aktuellen Kurs (${fmtEUR(p.currentPrice ?? p.buyPrice)}) verkaufen und Erlös dem Bargeld gutschreiben?`)){
+        state.cash += val;
+        state.positions = state.positions.filter(x => x.id !== p.id);
+        await saveState(); renderAll();
+      }
+    };
+    const delBtn = document.createElement('button');
+    delBtn.className = 'ghost small danger'; delBtn.textContent = '✕';
+    delBtn.title = 'Position ohne Kassenwirkung entfernen (Korrektur)';
+    delBtn.onclick = async () => {
+      if(confirm(`${p.symbol} ohne Gutschrift entfernen? (Korrektur einer Fehleingabe)`)){
+        state.positions = state.positions.filter(x => x.id !== p.id);
+        await saveState(); renderAll();
+      }
+    };
+    actionsDiv.append(chartBtn, sellBtn, delBtn);
+    actionsCell.appendChild(actionsDiv);
+
+    tbody.appendChild(tr);
+
+    if(expandedRow === p.id){
+      const expTr = document.createElement('tr');
+      const expTd = document.createElement('td');
+      expTd.colSpan = 9;
+      expTd.className = 'expand-widget';
+      const chartSymbol = p.underlyingSymbol || p.symbol;
+      const label = document.createElement('div');
+      label.className = 'sym-name';
+      label.style.marginBottom = '8px';
+      label.textContent = p.underlyingSymbol
+        ? `Live-Kurs Basiswert (${p.underlyingSymbol}) — Optionsschein selbst ist meist nicht bei TradingView gelistet`
+        : 'Live-Kurs';
+      const widgetHost = document.createElement('div');
+      expTd.append(label, widgetHost);
+      expTr.appendChild(expTd);
+      tbody.appendChild(expTr);
+      mountSingleQuoteWidget(widgetHost, chartSymbol);
+    }
+  });
+
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+}
+
+function mountSingleQuoteWidget(host, symbol){
+  host.innerHTML = '';
+  const container = document.createElement('div');
+  container.className = 'tradingview-widget-container';
+  const inner = document.createElement('div');
+  inner.className = 'tradingview-widget-container__widget';
+  container.appendChild(inner);
+  const script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-single-quote.js';
+  script.async = true;
+  script.textContent = JSON.stringify({
+    symbol: symbol,
+    width: '100%',
+    colorTheme: 'dark',
+    isTransparent: true,
+    locale: 'de_DE'
+  });
+  container.appendChild(script);
+  host.appendChild(container);
+}
+
+function renderTickerTape(){
+  const wrap = document.getElementById('tickerTapeWrap');
+  wrap.innerHTML = '';
+  let symbols = [];
+  const seen = new Set();
+  state.positions.forEach(p => {
+    const sym = p.underlyingSymbol || p.symbol;
+    if(sym && !seen.has(sym)){ seen.add(sym); symbols.push({ proName: sym, title: p.name || sym }); }
+  });
+  if(symbols.length === 0){
+    symbols = [
+      {proName:'FOREXCOM:SPXUSD', title:'S&P 500'},
+      {proName:'FOREXCOM:NSXUSD', title:'Nasdaq 100'},
+      {proName:'BINANCE:BTCEUR', title:'Bitcoin'},
+      {proName:'TVC:GOLD', title:'Gold'}
+    ];
+  }
+  const container = document.createElement('div');
+  container.className = 'tradingview-widget-container';
+  const inner = document.createElement('div');
+  inner.className = 'tradingview-widget-container__widget';
+  container.appendChild(inner);
+  const script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js';
+  script.async = true;
+  script.textContent = JSON.stringify({
+    symbols: symbols,
+    showSymbolLogo: true,
+    isTransparent: true,
+    displayMode: 'adaptive',
+    colorTheme: 'dark',
+    locale: 'de_DE'
+  });
+  container.appendChild(script);
+  wrap.appendChild(container);
+}
+
+function renderSparkline(){
+  const svg = document.getElementById('sparkline');
+  svg.innerHTML = '';
+  const hist = state.history;
+  if(hist.length < 2){
+    const text = document.createElementNS('http://www.w3.org/2000/svg','text');
+    text.setAttribute('x', 10); text.setAttribute('y', 60);
+    text.setAttribute('fill', '#8993A8'); text.setAttribute('font-size', '13');
+    text.textContent = 'Noch nicht genug Snapshots für einen Verlauf.';
+    svg.appendChild(text);
+    return;
+  }
+  const values = hist.map(h => h.value);
+  const min = Math.min(...values), max = Math.max(...values);
+  const range = (max - min) || 1;
+  const w = 600, h = 120, pad = 10;
+  const pts = hist.map((pt, i) => {
+    const x = pad + (i/(hist.length-1)) * (w - pad*2);
+    const y = h - pad - ((pt.value - min)/range) * (h - pad*2);
+    return [x,y];
+  });
+  const path = document.createElementNS('http://www.w3.org/2000/svg','polyline');
+  path.setAttribute('points', pts.map(p=>p.join(',')).join(' '));
+  path.setAttribute('fill','none');
+  path.setAttribute('stroke', values[values.length-1] >= values[0] ? '#C6A15B' : '#C1665C');
+  path.setAttribute('stroke-width','2');
+  svg.appendChild(path);
+  pts.forEach(([x,y]) => {
+    const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',x); c.setAttribute('cy',y); c.setAttribute('r',2.5);
+    c.setAttribute('fill', '#C6A15B');
+    svg.appendChild(c);
+  });
+}
+
+function availableChartSymbols(){
+  const seen = new Set();
+  const list = [];
+  state.positions.forEach(p => {
+    const sym = p.underlyingSymbol || p.symbol;
+    if(sym && !seen.has(sym)){ seen.add(sym); list.push({ symbol: sym, label: (p.name || p.symbol) + ' (' + sym + ')' }); }
+  });
+  return list;
+}
+
+function mountChartWidget(containerId, symbol){
+  const host = document.getElementById(containerId);
+  if(!host) return;
+  host.innerHTML = '';
+  host.dataset.mounted = '1';
+  const container = document.createElement('div');
+  container.className = 'tradingview-widget-container';
+  container.style.height = '100%';
+  const inner = document.createElement('div');
+  inner.className = 'tradingview-widget-container__widget';
+  inner.style.height = '100%';
+  container.appendChild(inner);
+  const script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+  script.async = true;
+  script.textContent = JSON.stringify({
+    autosize: true,
+    symbol: symbol,
+    interval: 'D',
+    timezone: 'Etc/UTC',
+    theme: 'dark',
+    style: '1',
+    locale: 'de_DE',
+    withdateranges: true,
+    allow_symbol_change: true,
+    details: true,
+    hide_side_toolbar: false,
+    support_host: 'https://www.tradingview.com'
+  });
+  container.appendChild(script);
+  host.appendChild(container);
+}
+
+function mountAdvancedChart(symbol){
+  currentChartSymbol = symbol;
+  state.chartSymbol = symbol;
+  saveState();
+  mountChartWidget('chartContainer', symbol);
+}
+
+const CHART_DEFAULT_SUB = 'Live TradingView-Chart deiner Positionen — im Chart kannst du auch frei suchen';
+
+function renderChartPanel(){
+  document.getElementById('chartPanelSub').textContent = CHART_DEFAULT_SUB;
+  const select = document.getElementById('chartSelect');
+  const list = availableChartSymbols();
+  select.innerHTML = '';
+  if(list.length === 0){
+    const opt = document.createElement('option');
+    opt.value = 'FOREXCOM:SPXUSD'; opt.textContent = 'S&P 500 (Beispiel — noch keine Positionen)';
+    select.appendChild(opt);
+  } else {
+    list.forEach(item => {
+      const opt = document.createElement('option');
+      opt.value = item.symbol; opt.textContent = item.label;
+      select.appendChild(opt);
+    });
+  }
+  const previous = currentChartSymbol;
+  const stillValid = list.some(i => i.symbol === currentChartSymbol) || (list.length === 0 && currentChartSymbol === 'FOREXCOM:SPXUSD');
+  if(!currentChartSymbol || !stillValid){
+    currentChartSymbol = list.length ? list[0].symbol : 'FOREXCOM:SPXUSD';
+  }
+  select.value = currentChartSymbol;
+  if(!document.getElementById('chartContainer').dataset.mounted || currentChartSymbol !== previous){
+    mountAdvancedChart(currentChartSymbol);
+  }
+}
+
+document.getElementById('chartSelect').addEventListener('change', (e) => {
+  mountAdvancedChart(e.target.value);
+});
+document.getElementById('chartCustomBtn').addEventListener('click', () => {
+  const v = document.getElementById('chartCustomSymbol').value.trim().toUpperCase();
+  if(v){
+    mountAdvancedChart(v);
+    document.getElementById('chartCustomSymbol').value = '';
+  }
+});
+
+function renderAll(){
+  renderSummary();
+  renderCash();
+  renderPositions();
+  renderTickerTape();
+  renderChartPanel();
+  renderSparkline();
+}
+function render(){ renderAll(); }
+
+document.getElementById('addForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const symbol = document.getElementById('fSymbol').value.trim().toUpperCase();
+  const name = document.getElementById('fName').value.trim();
+  const assetClass = document.getElementById('fClass').value;
+  const qty = parseFloat(document.getElementById('fQty').value);
+  const buyPrice = parseFloat(document.getElementById('fPrice').value);
+  const buyDate = document.getElementById('fDate').value || todayISO();
+
+  if(!symbol || isNaN(qty) || qty <= 0 || isNaN(buyPrice) || buyPrice < 0) return;
+
+  const isDeriv = derivClasses.includes(assetClass);
+  const underlyingSymbol = isDeriv ? document.getElementById('fUnderlying').value.trim().toUpperCase() : '';
+  const derivType = isDeriv ? document.getElementById('fDerivType').value : '';
+  const strikeRaw = isDeriv ? parseFloat(document.getElementById('fStrike').value) : NaN;
+  const leverageRaw = isDeriv ? parseFloat(document.getElementById('fLeverage').value) : NaN;
+  const expiry = isDeriv ? document.getElementById('fExpiry').value : '';
+  const wkn = isDeriv ? document.getElementById('fWkn').value.trim().toUpperCase() : '';
+
+  const cost = qty * buyPrice;
+  if(cost > state.cash){
+    if(!confirm(`Kaufkosten (${fmtEUR(cost)}) übersteigen dein Bargeld (${fmtEUR(state.cash)}). Trotzdem anlegen?`)) return;
+  }
+
+  state.positions.push({
+    id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    symbol, name, assetClass, qty, buyPrice, buyDate,
+    currentPrice: buyPrice,
+    underlyingSymbol, derivType,
+    strike: isNaN(strikeRaw) ? null : strikeRaw,
+    leverage: isNaN(leverageRaw) ? null : leverageRaw,
+    expiry, wkn
+  });
+  state.cash -= cost;
+  await saveState();
+  e.target.reset();
+  document.getElementById('derivFields').style.display = 'none';
+  document.getElementById('addChartPreviewWrap').style.display = 'none';
+  renderAll();
+});
+
+document.getElementById('snapshotBtn').addEventListener('click', async () => {
+  const value = totalValue();
+  const date = todayISO();
+  const existingIdx = state.history.findIndex(h => h.date === date);
+  if(existingIdx >= 0){ state.history[existingIdx].value = value; }
+  else { state.history.push({ date, value }); }
+  state.history.sort((a,b) => a.date.localeCompare(b.date));
+  await saveState();
+  renderSparkline();
+});
+
+loadState();
+</script>
+</body>
+</html>
