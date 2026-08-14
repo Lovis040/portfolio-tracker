@@ -460,16 +460,19 @@ let currentChartSymbol = null;
 
 async function loadState(){
   try{
-    const r = await window.storage.get(STATE_KEY);
-    if(r && r.value){ state = JSON.parse(r.value); }
-  }catch(e){ /* no saved state yet — use defaults */ }
+    const raw = localStorage.getItem(STATE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      state = Object.assign({ cash: 100000, startingCapital: 100000, positions: [], history: [], chartSymbol: null }, parsed);
+    }
+  }catch(e){ console.error('Laden fehlgeschlagen', e); }
   currentChartSymbol = state.chartSymbol || null;
   render();
 }
 
 async function saveState(){
   try{
-    await window.storage.set(STATE_KEY, JSON.stringify(state));
+    localStorage.setItem(STATE_KEY, JSON.stringify(state));
   }catch(e){ console.error('Speichern fehlgeschlagen', e); }
 }
 
